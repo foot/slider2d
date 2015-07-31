@@ -7,7 +7,11 @@
   (:import goog.History
            [goog.events EventType]))
 
-(defonce state (atom {:x 0 :y 0 :z 0}))
+(defonce state (atom {:tx 0 :ty 0 :tz 0
+                      :sx 0 :sy 0 :sz 0
+                      :rx 0 :ry 0 :rz 0}))
+
+(defonce mstate (atom {:w 75 :h 75}))
 
 (defn drag-move-fn [on-drag]
   (fn [evt]
@@ -51,16 +55,16 @@
 ;; Views
 
 (defn slider2d []
-  (let [w 75
-        h 75 
+  (let [cmp (reagent/current-component)
+        defaults {:min 0 :max 1 :value 1}
+        props (reagent/merge-props defaults (reagent/props cmp))
+        w (:w props)
+        h (:h props)
         pw 10 
         ph 10 
         ew (- w pw)
         eh (- h ph)
-        cmp (reagent/current-component)
-        defaults {:min 0 :max 1 :value 1}
         on-change (:on-change (reagent/props cmp))
-        props (reagent/merge-props defaults (reagent/props cmp))
         [x->value x->pixels] (both-scales [0 ew] [(:xmin props) (:xmax props)])
         [y->value y->pixels] (both-scales [0 eh] [(:ymax props) (:ymin props)]) 
         move-point (fn [x y]
@@ -75,22 +79,20 @@
         on-mouse-down (fn [evt]
                         (move-point (.-clientX evt) (.-clientY evt))
                         (dragging move-point))]
-    (fn []
-      (let [props (reagent/merge-props defaults (reagent/props cmp))]
-        [:div.plot.noselect {:on-mouse-down on-mouse-down
-                    :style {:width w
-                            :border "1px solid #ccc"
-                            :cursor "pointer"
-                            :height h
-                            :background-color (:background-color props)
-                            :position "relative"}}
-         [:div.point {:style {:position "absolute"
-                              :border-radius (str (* 0.5 pw) "px /" (* 0.5 ph) "px") 
-                              :width pw
-                              :height ph
-                              :left (x->pixels (:xvalue props))
-                              :top (y->pixels (:yvalue props))
-                              :background-color "#666"}}]]))))
+    [:div.plot.noselect {:on-mouse-down on-mouse-down
+                         :style {:width w
+                                 :border "1px solid #ccc"
+                                 :cursor "pointer"
+                                 :height h
+                                 :background-color (:background-color props)
+                                 :position "relative"}}
+     [:div.point {:style {:position "absolute"
+                          :border-radius (str (* 0.5 pw) "px /" (* 0.5 ph) "px") 
+                          :width pw
+                          :height ph
+                          :left (x->pixels (:xvalue props))
+                          :top (y->pixels (:yvalue props))
+                          :background-color "#666"}}]]))
 
 
 (defn input-text []
@@ -100,25 +102,50 @@
 
 (defn home-page []
   (let [s @state
-        ks [:x :y :z :u :v :w]]
-    [:div [:h2 "Welcome to slider2d"]
-     [:div [:a {:href "#/about"} "go to about page"]
-      (for [k ks]
-        [input-text {:key k :s state :path [k]}])
-      (for [b ks]
-        [:div {:key (str b)}
-         [:label (str b)]
-         (for [a ks]
-           [slider2d {:key (str a)
-                      :xmin 0
-                      :xmax 10
-                      :ymin 0
-                      :ymax 10
-                      :background-color (if (= a b) "#ddd" "eee")
-                      :on-change (fn [xvalue yvalue]
-                                   (swap! state into {a xvalue b yvalue}))
-                      :xvalue (a s)
-                      :yvalue (b s)}])])]]))
+        ms @mstate
+        ks (sort (keys s))]
+    [:div.container [:h2 "Welcome to slider2d"]
+     [slider2d {:xmin 30 
+                :xmax 75
+                :ymin 30 
+                :ymax 75
+                :w 75
+                :h 75
+                :background-color "#ddd"
+                :on-change (fn [xvalue yvalue]
+                             (swap! mstate into {:w xvalue :h yvalue}))
+                :xvalue (:w @mstate)
+                :yvalue (:h @mstate)}]  
+     [:table.noselect
+      [:tbody
+       [:tr
+        [:th ""]
+        (for [k ks]
+          [:th {:key (str k)} (str k)])]
+       (for [b ks]
+         [:tr {:key (str b)}
+          [:th (str b)]
+          (for [a ks]
+            [:td {:key (str a)} 
+             [slider2d {
+                        :xmin 0
+                        :xmax 10
+                        :ymin 0
+                        :ymax 10
+                        :w (:w ms)
+                        :h (:h ms)
+                        :background-color (if (= a b) "#ddd" "eee")
+                        :on-change (fn [xvalue yvalue]
+                                     (swap! state into {a xvalue b yvalue}))
+                        :xvalue (a s)
+                        :yvalue (b s)}]])
+          [:td 
+           [input-text {:key b :s state :path [b]}]]])
+       #_[:tr
+        [:th ""]
+        (for [k ks]
+          [:td {:key (str k)}
+           [input-text {:key k :s state :path [k]}]])]]]]))
 
 (defn about-page []
   [:div [:h2 "About slider2d"]
